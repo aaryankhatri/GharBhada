@@ -8,16 +8,16 @@
 |---|---|
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS + React Router + React Hook Form + Axios |
 | Backend | Node.js + Express + TypeScript + Zod validation + Multer (photo upload) |
-| Database | Prisma 7 ORM — dev मा SQLite, production मा PostgreSQL (Supabase) |
+| Database | Prisma 7 ORM — PostgreSQL (Supabase) |
 | Auth | JWT (7-day expiry) + bcrypt (12 salt rounds) |
 
 ## चलाउने तरिका (Local Development)
 
 ```bash
-# 1. Backend
+# 1. Backend — server/.env मा DATABASE_URL + DIRECT_URL (Supabase Postgres) राख्नुहोस्
 cd server
 npm install
-npx tsx prisma/apply-migrations.ts   # DB tables बनाउँछ (वा: npx prisma migrate dev)
+npx prisma migrate dev                # DB tables बनाउँछ
 npm run seed                          # demo accounts + 4 properties
 npm run dev                           # → http://localhost:4000
 
@@ -26,8 +26,6 @@ cd client
 npm install
 npm run dev                           # → http://localhost:5173
 ```
-
-> **नोट:** `prisma/apply-migrations.ts` offline fallback हो। सामान्य वातावरणमा `npx prisma migrate dev` प्रयोग गर्नुहोस् — दुवैले एउटै schema बनाउँछन्।
 
 ### Demo Accounts (password: `password123`)
 
@@ -82,7 +80,7 @@ bash test-e2e.sh    # 25 automated API tests (validation, auth guards, masking, 
 
 ## Production Deploy (Vercel + Railway/Render + Supabase)
 
-1. **Database:** Supabase मा project बनाएर connection string लिनुहोस्। `server/prisma/schema.prisma` मा `provider = "postgresql"` गर्नुहोस्, `@prisma/adapter-pg` install गरी `src/lib/prisma.ts` मा `PrismaPg` adapter प्रयोग गर्नुहोस्, अनि `npx prisma migrate dev` चलाउनुहोस्। (SQLite मा JSON फिल्डहरू string मा राखिएका छन् — Postgres मा गएपछि `Json` type मा migrate गर्न सकिन्छ।)
+1. **Database:** ✅ Done — Supabase Postgres मा migrate भइसक्यो (`@prisma/adapter-pg` + `PrismaPg` adapter प्रयोग हुँदैछ)।
 2. **Backend (Railway/Render):** `server/` deploy गर्नुहोस्। Env: `DATABASE_URL`, `JWT_SECRET` (लामो random string), `CLIENT_URL` (frontend को URL), `PORT`। **नोट:** uploads/ को लागि production मा S3/Supabase Storage प्रयोग गर्नुहोस् — ephemeral filesystem मा photos हराउँछन्।
 3. **Frontend (Vercel):** `client/` deploy गर्नुहोस्। Env: `VITE_API_URL` = backend URL। SPA routing को लागि rewrite rule: सबै path → `/index.html`।
 

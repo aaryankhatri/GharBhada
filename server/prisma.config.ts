@@ -5,7 +5,8 @@ import { defineConfig } from 'prisma/config';
 export default defineConfig({
   schema: path.join('prisma', 'schema.prisma'),
   datasource: {
-    url: process.env.DATABASE_URL ?? 'file:./prisma/dev.db',
+    // Migrate needs the direct (non-pooled) connection.
+    url: process.env.DIRECT_URL,
   },
   migrations: {
     path: path.join('prisma', 'migrations'),
