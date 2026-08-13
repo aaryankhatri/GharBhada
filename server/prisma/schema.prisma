@@ -3,8 +3,9 @@
 // SQLite-era compatibility को लागि String मा serialize गरिएको छ — चाहे Json type मा migrate गर्न सकिन्छ।
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
