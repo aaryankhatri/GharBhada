@@ -1,0 +1,149 @@
+// GharBhada — Prisma Schema
+// Dev: SQLite | Production: PostgreSQL (Supabase)
+// Production मा जान: provider = "postgresql" र DATABASE_URL फेर्नुहोस्।
+// नोट: SQLite compatibility को लागि JSON fields (amenities, photos, coTenants)
+// String मा serialize गरिन्छ। Postgres मा गएपछि चाहे Json type मा migrate गर्न सकिन्छ।
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id                Int        @id @default(autoincrement())
+  email             String     @unique
+  phone             String     @unique
+  passwordHash      String
+  role              String // 'tenant' | 'landlord' | 'admin'
+  fullName          String
+  address           String
+  citizenshipNumber String?
+  panNumber         String?
+  occupation        String?
+  organization      String?
+  isVerified        Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  resetCode         String?
+  resetCodeExpiresAt DateTime?
+
+  properties        Property[] @relation("LandlordProperties")
+  tenantBookings    Booking[]  @relation("TenantBookings")
+  tenantAgreements  Agreement[] @relation("TenantAgreements")
+  landlordAgreements Agreement[] @relation("LandlordAgreements")
+  tenantPayments    Payment[]  @relation("TenantPayments")
+  landlordPayments  Payment[]  @relation("LandlordPayments")
+  visitRequests     VisitRequest[] @relation("TenantVisitRequests")
+}
+
+model Property {
+  id            Int      @id @default(autoincrement())
+  landlordId    Int
+  landlord      User     @relation("LandlordProperties", fields: [landlordId], references: [id])
+  title         String
+  wardNumber    Int // 1–32 (KMC)
+  tole          String
+  municipality  String   @default("काठमाडौं महानगरपालिका")
+  district      String   @default("काठमाडौं")
+  monthlyRent   Int // min 5000
+  advanceAmount Int
+  rentDueDay    Int      @default(5) // १–५ गते
+  availableFrom DateTime
+  description   String?
+  amenities     String // JSON: {wifi, parking, attachedBathroom, ...}
+  waterAvailability String // JSON: {type: '24hours'|'limited', daysPerWeek, timesPerDay, hoursPerSession, timeSlots}
+  photos        String // JSON: [{url, label}] — min 3
+  googleMapsPin String?
+  isVerified    Boolean  @default(false) // admin approval
+  isAvailable   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bookings      Booking[]
+  agreements    Agreement[]
+  visitRequests VisitRequest[]
+}
+
+model Booking {
+  id                           Int      @id @default(autoincrement())
+  tenantId                     Int
+  tenant                       User     @relation("TenantBookings", fields: [tenantId], references: [id])
+  propertyId                   Int
+  property                     Property @relation(fields: [propertyId], references: [id])
+  status                       String   @default("pending") // pending | accepted | rejected | completed
+  tenantName                   String
+  tenantPermanentAddress       String
+  tenantTemporaryAddress       String?
+  tenantCitizenshipNumber      String
+  tenantCitizenshipPhotoFront  String
+  tenantCitizenshipPhotoBack   String
+  tenantPhone                  String
+  tenantEmail                  String?
+  tenantOccupation             String
+  tenantOrganization           String?
+  coTenants                    String? // JSON: [{name, citizenshipNo, phone, relationship}] max 3
+  emergencyContactName         String
+  emergencyContactPhone        String
+  emergencyContactRelationship String
+  hasPhysicallyVisited         Boolean  @default(false)
+  moveInDate                   DateTime
+  advanceAmount                Int
+  paymentId                    Int?
+  agreementId                  Int?
+  createdAt                    DateTime @default(now())
+
+  payments Payment[]
+}
+
+// Tenant asks landlord to arrange an in-person visit before booking
+model VisitRequest {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int
+  tenant     User     @relation("TenantVisitRequests", fields: [tenantId], references: [id])
+  propertyId Int
+  property   Property @relation(fields: [propertyId], references: [id])
+  message    String?
+  status     String   @default("pending") // pending | contacted
+  createdAt  DateTime @default(now())
+}
+
+// Phase 2: Agreement PDF generation (standard रु २०,०००+ / simple रु ५,०००–१९,९९९)
+model Agreement {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int
+  tenant           User     @relation("TenantAgreements", fields: [tenantId], references: [id])
+  landlordId       Int
+  landlord         User     @relation("LandlordAgreements", fields: [landlordId], references: [id])
+  propertyId       Int
+  property         Property @relation(fields: [propertyId], references: [id])
+  agreementType    String // 'standard' | 'simple'
+  monthlyRent      Int
+  advanceAmount    Int
+  moveInDate       DateTime
+  noticePeriodDays Int      @default(35)
+  pdfUrl           String?
+  isRegistered     Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+// Phase 2: eSewa / Khalti / ConnectIPS
+model Payment {
+  id              Int      @id @default(autoincrement())
+  tenantId        Int
+  tenant          User     @relation("TenantPayments", fields: [tenantId], references: [id])
+  landlordId      Int
+  landlord        User     @relation("LandlordPayments", fields: [landlordId], references: [id])
+  bookingId       Int?
+  booking         Booking? @relation(fields: [bookingId], references: [id])
+  agreementId     Int?
+  paymentType     String // 'advance' | 'rent' | 'tax'
+  amount          Int
+  paymentMethod   String // 'esewa' | 'khalti' | 'connectips' | 'mock'
+  transactionUuid String   @unique
+  paymentStatus   String   @default("pending") // pending | success | failed
+  paymentDate     DateTime @default(now())
+  receiptUrl      String?
+}

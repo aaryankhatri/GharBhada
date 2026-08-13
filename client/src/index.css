@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-slate-50 via-blue-50/50 to-violet-50/40 text-gray-900 font-sans;
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-sm hover:shadow-md hover:brightness-110;
+  }
+  .btn-success {
+    @apply btn bg-emerald-500 text-white shadow-sm hover:bg-emerald-600 hover:shadow-md;
+  }
+  .btn-accent {
+    @apply btn bg-accent text-white shadow-sm hover:bg-amber-600 hover:shadow-md;
+  }
+  .btn-outline {
+    @apply btn border border-gray-300 bg-white hover:bg-gray-50 hover:border-primary/40;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white shadow-sm hover:bg-red-600 hover:shadow-md;
+  }
+  .input {
+    @apply w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200/80;
+  }
+  .card-hover {
+    @apply transition hover:shadow-lg hover:-translate-y-0.5 hover:border-primary/30;
+  }
+  .err {
+    @apply text-sm text-red-600 mt-1;
+  }
+}

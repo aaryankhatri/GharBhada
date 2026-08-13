@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+.env
+server/prisma/dev.db*
+server/uploads/*
+!server/uploads/seed-*.png
+!server/uploads/.gitkeep
+server/src/generated/
