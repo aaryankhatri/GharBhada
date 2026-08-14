@@ -28,6 +28,12 @@ app.get('/api/debug-db', async (_req, res) => {
     res.status(500).json({
       message: e.message, code: e.code, errno: e.errno,
       address: e.address, port: e.port, syscall: e.syscall,
+      nestedErrors: Array.isArray(e.errors)
+        ? e.errors.map((sub: any) => ({
+            message: sub.message, code: sub.code, errno: sub.errno,
+            address: sub.address, port: sub.port, syscall: sub.syscall,
+          }))
+        : undefined,
       hostUsed: process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':***@'),
     });
   } finally {
