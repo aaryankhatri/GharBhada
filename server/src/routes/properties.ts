@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole, AuthRequest } from '../middleware/auth';
 import { propertyPhotoUpload } from '../middleware/upload';
+import { sendNewListingNotification, MailerConfigError } from '../lib/mailer';
 
 const router = Router();
 
@@ -162,6 +163,28 @@ router.post(
       property: serializeProperty(property),
       message: 'Listing admin approval को लागि पठाइयो (२४–४८ घण्टा)',
     });
+
+    // Notify admins — best effort, runs after responding so it never blocks/breaks listing creation
+    try {
+      const [admins, landlord] = await Promise.all([
+        prisma.user.findMany({ where: { role: 'admin' }, select: { email: true } }),
+        prisma.user.findUnique({ where: { id: req.user!.id }, select: { fullName: true } }),
+      ]);
+      await Promise.all(
+        admins.map(a =>
+          sendNewListingNotification(a.email, {
+            propertyId: property.id,
+            title: property.title,
+            landlordName: landlord?.fullName ?? 'Landlord',
+            wardNumber: property.wardNumber,
+            tole: property.tole,
+            monthlyRent: property.monthlyRent,
+          })
+        )
+      );
+    } catch (e) {
+      if (!(e instanceof MailerConfigError)) console.error('Admin notification email failed:', e);
+    }
   }
 );
 
