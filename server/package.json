@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "node dist/src/index.js",
     "seed": "tsx prisma/seed.ts",
+    "setup-storage": "tsx scripts/setup-storage.ts",
+    "check-db": "tsx scripts/check-db.ts",
     "db:migrate": "prisma migrate dev",
     "studio": "prisma studio --port 5555",
     "postinstall": "prisma generate"
@@ -21,6 +23,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "@supabase/supabase-js": "^2.112.3",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

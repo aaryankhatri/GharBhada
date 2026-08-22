@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole, AuthRequest } from '../middleware/auth';
 import { propertyPhotoUpload } from '../middleware/upload';
 import { sendNewListingNotification, MailerConfigError } from '../lib/mailer';
+import { cloudStorageEnabled, uploadPropertyPhoto } from '../lib/storage';
 
 const router = Router();
 
@@ -139,7 +140,12 @@ router.post(
     }
     const d = parsed.data;
     const labels = ['कोठा', 'बाथरूम', 'भवन/प्रवेशद्वार', 'भान्सा', 'पार्किङ', 'अन्य', 'अन्य', 'अन्य'];
-    const photos = files.map((f, i) => ({ url: `/uploads/${f.filename}`, label: labels[i] ?? 'अन्य' }));
+    const photos = await Promise.all(
+      files.map(async (f, i) => ({
+        url: cloudStorageEnabled ? await uploadPropertyPhoto(f, req.user!.id) : `/uploads/${f.filename}`,
+        label: labels[i] ?? 'अन्य',
+      }))
+    );
 
     const property = await prisma.property.create({
       data: {

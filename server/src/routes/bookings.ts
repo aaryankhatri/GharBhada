@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole, AuthRequest } from '../middleware/auth';
 import { citizenshipUpload } from '../middleware/upload';
 import { serializeProperty } from './properties';
+import { cloudStorageEnabled, uploadCitizenshipPhoto, getCitizenshipPhotoUrl } from '../lib/storage';
 
 const router = Router();
 
@@ -72,6 +73,10 @@ router.post(
     }
     const d = parsed.data;
 
+    const [frontRef, backRef] = cloudStorageEnabled
+      ? await Promise.all([uploadCitizenshipPhoto(front, req.user!.id), uploadCitizenshipPhoto(back, req.user!.id)])
+      : [`/uploads/${front.filename}`, `/uploads/${back.filename}`];
+
     const property = await prisma.property.findUnique({ where: { id: d.propertyId } });
     if (!property || !property.isVerified || !property.isAvailable) {
       return res.status(404).json({ error: 'यो property उपलब्ध छैन' });
@@ -95,8 +100,8 @@ router.post(
         tenantPermanentAddress: d.tenantPermanentAddress,
         tenantTemporaryAddress: d.tenantTemporaryAddress ?? null,
         tenantCitizenshipNumber: d.tenantCitizenshipNumber,
-        tenantCitizenshipPhotoFront: `/uploads/${front.filename}`,
-        tenantCitizenshipPhotoBack: `/uploads/${back.filename}`,
+        tenantCitizenshipPhotoFront: frontRef,
+        tenantCitizenshipPhotoBack: backRef,
         tenantPhone: d.tenantPhone,
         tenantEmail: d.tenantEmail || null,
         tenantOccupation: d.tenantOccupation,
@@ -111,7 +116,7 @@ router.post(
       },
     });
     // Phase 2: landlord लाई SMS/email notification
-    res.status(201).json({ booking: serializeBooking(booking), message: 'Booking request घरबेटीलाई पठाइयो' });
+    res.status(201).json({ booking: await serializeBooking(booking), message: 'Booking request घरबेटीलाई पठाइयो' });
   }
 );
 
@@ -123,17 +128,19 @@ router.get('/tenant', requireAuth, requireRole('tenant'), async (req: AuthReques
     include: { property: { include: { landlord: { select: { id: true, fullName: true, phone: true } } } } },
   });
   res.json({
-    bookings: bookings.map(b => {
-      const sb: any = serializeBooking(b);
-      sb.property = serializeProperty(b.property);
-      // Landlord contact + exact map pin unmasked ONLY after acceptance
-      if (b.status !== 'accepted' && b.status !== 'completed') {
-        const ph = sb.property.landlord.phone as string;
-        sb.property.landlord.phone = ph.slice(0, 3) + 'XXXXX' + ph.slice(-2);
-        sb.property.googleMapsPin = null;
-      }
-      return sb;
-    }),
+    bookings: await Promise.all(
+      bookings.map(async b => {
+        const sb: any = await serializeBooking(b);
+        sb.property = serializeProperty(b.property);
+        // Landlord contact + exact map pin unmasked ONLY after acceptance
+        if (b.status !== 'accepted' && b.status !== 'completed') {
+          const ph = sb.property.landlord.phone as string;
+          sb.property.landlord.phone = ph.slice(0, 3) + 'XXXXX' + ph.slice(-2);
+          sb.property.googleMapsPin = null;
+        }
+        return sb;
+      })
+    ),
   });
 });
 
@@ -145,11 +152,13 @@ router.get('/landlord', requireAuth, requireRole('landlord'), async (req: AuthRe
     include: { property: true },
   });
   res.json({
-    bookings: bookings.map(b => {
-      const sb: any = serializeBooking(b);
-      sb.property = serializeProperty(b.property);
-      return sb;
-    }),
+    bookings: await Promise.all(
+      bookings.map(async b => {
+        const sb: any = await serializeBooking(b);
+        sb.property = serializeProperty(b.property);
+        return sb;
+      })
+    ),
   });
 });
 
@@ -163,7 +172,7 @@ router.put('/:id/accept', requireAuth, requireRole('landlord'), async (req: Auth
     data: { status: 'accepted' },
   });
   // Phase 2: tenant लाई notification + advance payment page redirect + agreement generation
-  res.json({ booking: serializeBooking(updated), message: 'Booking स्वीकार गरियो — tenant लाई advance payment को लागि सूचित गरिनेछ' });
+  res.json({ booking: await serializeBooking(updated), message: 'Booking स्वीकार गरियो — tenant लाई advance payment को लागि सूचित गरिनेछ' });
 });
 
 // PUT /api/bookings/:id/reject
@@ -175,7 +184,7 @@ router.put('/:id/reject', requireAuth, requireRole('landlord'), async (req: Auth
     where: { id: booking.id },
     data: { status: 'rejected' },
   });
-  res.json({ booking: serializeBooking(updated) });
+  res.json({ booking: await serializeBooking(updated) });
 });
 
 async function ownBooking(req: AuthRequest, res: any) {
@@ -190,8 +199,16 @@ async function ownBooking(req: AuthRequest, res: any) {
   return booking;
 }
 
-function serializeBooking(b: any) {
+// Citizenship photos live in a private bucket when cloud storage is on — resolve the stored path to
+// a short-lived signed URL only when a booking is actually sent to its tenant/landlord.
+async function serializeBooking(b: any) {
   const { property, ...rest } = b;
+  if (cloudStorageEnabled) {
+    [rest.tenantCitizenshipPhotoFront, rest.tenantCitizenshipPhotoBack] = await Promise.all([
+      getCitizenshipPhotoUrl(rest.tenantCitizenshipPhotoFront),
+      getCitizenshipPhotoUrl(rest.tenantCitizenshipPhotoBack),
+    ]);
+  }
   return { ...rest, coTenants: b.coTenants ? JSON.parse(b.coTenants) : [] };
 }
 

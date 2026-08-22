@@ -81,7 +81,7 @@ bash test-e2e.sh    # 25 automated API tests (validation, auth guards, masking, 
 ## Production Deploy (Vercel + Railway/Render + Supabase)
 
 1. **Database:** ✅ Done — Supabase Postgres मा migrate भइसक्यो (`@prisma/adapter-pg` + `PrismaPg` adapter प्रयोग हुँदैछ)।
-2. **Backend (Railway/Render):** `server/` deploy गर्नुहोस्। Env: `DATABASE_URL`, `JWT_SECRET` (लामो random string), `CLIENT_URL` (frontend को URL), `PORT`। **नोट:** uploads/ को लागि production मा S3/Supabase Storage प्रयोग गर्नुहोस् — ephemeral filesystem मा photos हराउँछन्।
+2. **Backend (Railway/Render):** `server/` deploy गर्नुहोस्। Env: `DATABASE_URL`, `JWT_SECRET` (लामो random string), `CLIENT_URL` (frontend को URL), `PORT`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`। ✅ Done — photos/citizenship docs अब Supabase Storage मा जान्छन् (ephemeral disk होइन)। Deploy गर्नु अघि एक पटक `npm run setup-storage` चलाएर buckets बनाउनुहोस्।
 3. **Frontend (Vercel):** `client/` deploy गर्नुहोस्। Env: `VITE_API_URL` = backend URL। SPA routing को लागि rewrite rule: सबै path → `/index.html`।
 
 ## Roadmap — Phase 2 र 3
