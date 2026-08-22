@@ -1,0 +1,43 @@
+name: Supabase Keepalive
+
+# Free-tier Supabase projects auto-pause after ~1 week with no database activity,
+# which then breaks local dev and production with a Supavisor "tenant/user not found"
+# error until someone manually resumes the project from the dashboard. This workflow
+# runs a trivial read-only query every 3 days so the project always looks active and
+# never has a chance to hit that 1-week idle window.
+#
+# One-time setup required: add a repository secret named DATABASE_URL (Settings →
+# Secrets and variables → Actions → New repository secret) with the same pooled
+# connection string used in server/.env. Nothing else to do after that — this runs
+# on its own schedule from the main branch.
+
+on:
+  schedule:
+    - cron: '0 6 */3 * *' # every 3 days at 06:00 UTC — safely under the ~7 day pause window
+  workflow_dispatch: {} # lets you trigger it manually from the Actions tab to test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Ping Supabase Postgres (SELECT 1, read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          npm install pg@8
+          node -e "
+            const { Client } = require('pg');
+            if (!process.env.DATABASE_URL) {
+              console.error('DATABASE_URL secret is not set — see comment at top of this workflow file.');
+              process.exit(1);
+            }
+            const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+            client.connect()
+              .then(() => client.query('select 1'))
+              .then(() => { console.log('Keepalive OK — Supabase project stayed active.'); return client.end(); })
+              .catch((e) => { console.error('Keepalive FAILED:', e.message); process.exit(1); });
+          "
