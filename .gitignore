@@ -3,6 +3,8 @@ node_modules/
 dist/
 *.log
 .env
+.env.local
+.env.production
 server/prisma/dev.db*
 server/uploads/*
 !server/uploads/seed-*.png
